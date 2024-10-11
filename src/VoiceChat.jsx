@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
 
-const socket = io('https://voice-room-be.onrender.com');
+const socket = io('https://voice-room-be.onrender.com', {
+    transports: ['websocket', 'polling'],  // Đảm bảo sử dụng websocket trước
+    secure: true  // Đảm bảo các kết nối socket được bảo mật
+});
+
 
 const VoiceChat = () => {
     const [remoteStream, setRemoteStream] = useState(null);
@@ -30,7 +34,14 @@ const VoiceChat = () => {
         const createPeerConnection = () => {
             const pc = new RTCPeerConnection({
                 iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
+                    {
+                        urls: 'turn:113.180.228.189:3478',  // Địa chỉ IP của TURN server
+                        username: 'my_user',  // Username bạn đã định nghĩa
+                        credential: 'Y0ur$ecret#1234',  // Static auth secret đã cấu hình trong Coturn
+                    },
+                    {
+                        urls: 'stun:stun.l.google.com:19302',  // STUN server
+                    },
                 ],
             });
 
