@@ -40,7 +40,7 @@ const VoiceChat = () => {
                         credential: 'Y0ur$ecret#1234',  // Static auth secret đã cấu hình trong Coturn
                     },
                     {
-                        urls: 'stun:stun.l.google.com:19302',  // STUN server
+                        urls: 'stun:stun1.l.google.com:19302',  // STUN server
                     },
                 ],
             });
