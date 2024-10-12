@@ -33,16 +33,20 @@ const VoiceChat = () => {
     useEffect(() => {
         const createPeerConnection = () => {
             const pc = new RTCPeerConnection({
-                iceServers: [
-                    {
-                        urls: 'turn:113.180.228.189:3478',  // Địa chỉ IP của TURN server
-                        username: 'my_user',  // Username bạn đã định nghĩa
-                        credential: 'Y0ur$ecret#1234',  // Static auth secret đã cấu hình trong Coturn
-                    },
-                    {
-                        urls: 'stun:stun1.l.google.com:19302',  // STUN server
-                    },
-                ],
+                iceServers: [{
+                    urls: ["stun:hk-turn1.xirsys.com"]
+                }, {
+                    username: "-3LKC68VNAMjswMpgNk2AsJh8n60STZq4sZ1JrqZe5nZ3ABVUU_yTgN7sXW9UlgPAAAAAGcJ8mZ0aHVhbg==",
+                    credential: "595f356e-884d-11ef-b41a-0242ac120004",
+                    urls: [
+                        "turn:hk-turn1.xirsys.com:80?transport=udp",
+                        "turn:hk-turn1.xirsys.com:3478?transport=udp",
+                        "turn:hk-turn1.xirsys.com:80?transport=tcp",
+                        "turn:hk-turn1.xirsys.com:3478?transport=tcp",
+                        "turns:hk-turn1.xirsys.com:443?transport=tcp",
+                        "turns:hk-turn1.xirsys.com:5349?transport=tcp"
+                    ]
+                }]
             });
 
             pc.onicecandidate = (event) => {
