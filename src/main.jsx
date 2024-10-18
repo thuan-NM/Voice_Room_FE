@@ -1,13 +1,12 @@
 import React from 'react';
-import ReactDOM from 'react-dom'; // Change this line
-import { StrictMode } from 'react';
-import App from './App.jsx';
-import './index.css';
-import VoiceChat from './App.jsx';
+import ReactDOM from 'react-dom';  // Không dùng 'react-dom/client' cho React 16
+import App from './App';
+import './index.css';  // File chứa Tailwind directives
+import VoiceChat from './VoiceChat';
 
 ReactDOM.render(
-    <StrictMode>
-        <App />
-    </StrictMode>,
-    document.getElementById('root') // Use this instead of createRoot
+  <React.StrictMode>
+    <VoiceChat />
+  </React.StrictMode>,
+  document.getElementById('root')
 );

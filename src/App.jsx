@@ -3,7 +3,7 @@ import VoiceChat from './VoiceChat';
 
 const App = () => {
     return (
-        <div>
+        <div className='!bg-indigo-500'>
             <h1>Real-time Voice Chat</h1>
             <VoiceChat />
         </div>
