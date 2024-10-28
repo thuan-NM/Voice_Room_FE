@@ -25,9 +25,13 @@
         "vite": "^5.4.9"
     },
     "dependencies": {
+        "file-saver": "^2.0.5",
+        "peerjs": "^1.5.4",
         "react": "^16.14.0",
         "react-dom": "^16.14.0",
+        "react-icons": "^5.3.0",
         "react-mic": "^12.4.6",
+        "react-toastify": "^8.2.0",
         "socket.io-client": "^4.8.0"
     }
 }
