@@ -5,7 +5,7 @@ import VideoCallApp from './VideoCallApp';
 const App = () => {
     return (
         <Router>
-            <div className='!bg-indigo-500'>
+            <div className=''>
                 <Routes>
                     <Route path="/call/:userId/:companyId" element={<VideoCallApp />} />
                 </Routes>

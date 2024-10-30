@@ -25,6 +25,10 @@
         "vite": "^5.4.9"
     },
     "dependencies": {
+        "@emotion/react": "^11.13.3",
+        "@emotion/styled": "^11.13.0",
+        "@mui/icons-material": "^6.1.6",
+        "@mui/material": "^6.1.6",
         "file-saver": "^2.0.5",
         "peerjs": "^1.5.4",
         "react": "^16.14.0",

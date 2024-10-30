@@ -9,9 +9,30 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { saveAs } from 'file-saver'; // Đảm bảo đã cài đặt file-saver: npm install file-saver
 import { getRoomInfo } from './api';
+import {
+    Container,
+    Box,
+    Typography,
+    Grid,
+    Drawer,
+    TextField,
+    Button,
+} from '@mui/material';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
 
 const socket = io('http://localhost:5000', {
     transports: ['websocket', 'polling'],
+});
+
+const theme = createTheme({
+    palette: {
+        primary: {
+            main: '#1976d2', // Blue
+        },
+        secondary: {
+            main: '#d32f2f', // Red
+        },
+    },
 });
 
 const VideoCallApp = () => {
@@ -26,6 +47,7 @@ const VideoCallApp = () => {
     const [recording, setRecording] = useState(false);
     const [userInfo, setUserInfo] = useState(null);
     const [userType, setUserType] = useState(null);
+    const [userInRoom, setUserInRoom] = useState([]);
     const [participants, setParticipants] = useState([]);
     const [username, setUsername] = useState(''); // Khai báo biến username
     const [messages, setMessages] = useState([]); // Khai báo state cho tin nhắn
@@ -34,7 +56,8 @@ const VideoCallApp = () => {
     const localStreamRef = useRef(null);
     const localVideoRef = useRef(null);
     const roomId = `${userId}-${companyId}`;
-
+    const [drawerOpen, setDrawerOpen] = useState(false);
+    const [drawerContent, setDrawerContent] = useState('participants');
 
     useEffect(() => {
         const getLocalStream = async () => {
@@ -111,7 +134,7 @@ const VideoCallApp = () => {
         const fetchRoomInfo = async () => {
             try {
                 const roomData = await getRoomInfo(roomId);
-                setParticipants(roomData.participants);
+                setUserInRoom(roomData.participants)
             } catch (error) {
                 console.error('Error fetching room information:', error);
             }
@@ -120,13 +143,12 @@ const VideoCallApp = () => {
         if (isJoined) {
             fetchRoomInfo();
         }
-    }, [peerConnections, remoteStreams]);
+    }, [isJoined, roomId, peerConnections, remoteStreams]);
 
     useEffect(() => {
         if (!isJoined) return;
-        // Handle 'allUsers' event
+
         socket.on('allUsers', (usersInfo) => {
-            console.log('Received allUsers:', usersInfo);
             const pcs = {};
             const participantList = [];
 
@@ -146,7 +168,7 @@ const VideoCallApp = () => {
                 }
             });
             setPeerConnections(pcs);
-            // setParticipants(participantList);
+            setParticipants(participantList);
         });
 
         // Handle 'offer' event
@@ -232,16 +254,15 @@ const VideoCallApp = () => {
         // Handle 'userInfo' event
         // Trong phần useEffect xử lý 'userInfo' event
 
-        socket.on('userInfo', ({ userInfo, userType, username: serverUsername }) => { // Nhận username từ server
-            console.log('Received userInfo:', { userInfo, userType, serverUsername });
+        // In your socket event handlers
+        socket.on('userInfo', ({ userInfo, userType, username: serverUsername }) => {
             setUserInfo(userInfo);
             setUserType(userType);
-            setUsername(serverUsername); // Thiết lập username từ server
+            setUsername(serverUsername);
 
-            // Thêm chính mình vào danh sách participants
+            // Add yourself to participants
             setParticipants((prev) => [...prev, { socketId: socket.id, username: serverUsername }]);
         });
-
 
         // Handle 'userJoined' event
         socket.on('userJoined', ({ username: newUsername, socketId }) => {
@@ -387,76 +408,110 @@ const VideoCallApp = () => {
         toast.info('Chia sẻ màn hình đã dừng.');
     };
 
+    const openParticipants = () => {
+        setDrawerContent('participants');
+        setDrawerOpen(true);
+    };
+
+    // Hàm mở chat
+    const openChat = () => {
+        setDrawerContent('chat');
+        setDrawerOpen(true);
+    };
+
     return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
+        <ThemeProvider theme={theme}>
             <ToastContainer position="top-right" autoClose={5000} hideProgressBar={false} />
 
             {!isJoined ? (
-                <div className="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
-                    <h2 className="text-2xl font-semibold mb-6 text-center">Tham Gia Phòng</h2>
-                    <div className="mb-6">
-                        <label className="block text-gray-700 mb-2">Room ID</label>
-                        <input
-                            className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            type="text"
-                            placeholder="Room ID"
-                            value={roomId}
-                            disabled
-                        />
-                    </div>
-                    <div className="mb-6">
-                        <label className="block text-gray-700 mb-2">Key</label>
-                        <input
-                            className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            type="text"
-                            placeholder="Key"
-                            value={key}
-                            onChange={(e) => setKey(e.target.value)}
-                        />
-                    </div>
-                    <button
-                        className="w-full bg-blue-500 text-white p-3 rounded-md hover:bg-blue-600 transition duration-200"
-                        onClick={joinRoom}
+                // Join Room UI
+                <Container maxWidth="sm">
+                    <Box
+                        sx={{
+                            mt: 8,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                        }}
                     >
-                        Join Room
-                    </button>
-                </div>
-            ) : (
-                <>
-                    {/* Video Section */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 w-full h-3/4">
-                        {/* Local Video */}
-                        <div className="relative h-40 md:h-64">
-                            <Video
-                                stream={localStreamRef.current}
-                                muted={true}
+                        <Typography component="h1" variant="h5">
+                            Join Room
+                        </Typography>
+                        <Box component="form" sx={{ mt: 3 }}>
+                            <TextField
+                                variant="outlined"
+                                margin="normal"
+                                required
+                                fullWidth
+                                label="Room ID"
+                                value={roomId}
+                                disabled
                             />
-                            <span className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded">
-                                You
-                            </span>
-                        </div>
+                            <TextField
+                                variant="outlined"
+                                margin="normal"
+                                required
+                                fullWidth
+                                label="Key"
+                                value={key}
+                                onChange={(e) => setKey(e.target.value)}
+                            />
+                            <Button
+                                type="button"
+                                fullWidth
+                                variant="contained"
+                                color="primary"
+                                sx={{ mt: 2 }}
+                                onClick={joinRoom}
+                            >
+                                Join
+                            </Button>
+                        </Box>
+                    </Box>
+                </Container>
+            ) : (
+                // Video Call UI
+                <Box sx={{ display: 'flex', height: '100vh' }}>
+                    {/* Video Area */}
+                    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                        <Grid container spacing={2} sx={{ flex: 1, p: 2, overflowY: 'auto' }}>
+                            {/* Local Video */}
+                            <Grid item xs={12} sm={6} md={4} lg={3} sx={{ position: 'relative' }}>
+                                <Video stream={localStreamRef.current} muted={true} />
+                                <Typography
+                                    variant="caption"
+                                    sx={{ position: 'absolute', bottom: 8, left: 8, color: '#fff' }}
+                                >
+                                    You
+                                </Typography>
+                            </Grid>
 
-                        {/* Remote Videos */}
-                        {Object.entries(remoteStreams).map(([socketId, stream]) => {
-                            const participant = participants.find(p => p.socketId === socketId);
-                            const remoteUsername = participant ? participant.username : 'User';
-                            return (
-                                <div key={socketId} className="relative h-40 md:h-64">
-                                    <Video
-                                        stream={stream}
-                                        muted={false}
-                                    />
-                                    <span className="absolute bottom-2 left-2 bg-black bg-opacity-50 text-white px-2 py-1 rounded">
-                                        {remoteUsername}
-                                    </span>
-                                </div>
-                            );
-                        })}
-                    </div>
-
-                    {/* Controls */}
-                    <div className="w-full mt-5 flex flex-col md:flex-row items-center justify-center gap-4">
-                        {/* Control Buttons */}
+                            {/* Remote Videos */}
+                            {Object.entries(remoteStreams).map(([socketId, stream]) => {
+                                const participant = participants.find((p) => p.socketId === socketId);
+                                const remoteUsername = participant ? participant.username : 'User';
+                                return (
+                                    <Grid
+                                        key={socketId}
+                                        item
+                                        xs={12}
+                                        sm={6}
+                                        md={4}
+                                        lg={3}
+                                        sx={{ position: 'relative' }}
+                                    >
+                                        <Video stream={stream} muted={false} />
+                                        <Typography
+                                            variant="caption"
+                                            sx={{ position: 'absolute', bottom: 8, left: 8, color: '#fff' }}
+                                        >
+                                            {remoteUsername}
+                                        </Typography>
+                                    </Grid>
+                                );
+                            })}
+                        </Grid>
+                        {/* Controls */}
                         <Controls
                             micMuted={micMuted}
                             toggleMic={toggleMic}
@@ -467,19 +522,33 @@ const VideoCallApp = () => {
                             toggleScreenShare={toggleScreenShare}
                             recording={recording}
                             toggleRecording={toggleRecording}
+                            openParticipants={openParticipants}
+                            openChat={openChat}
                         />
-                    </div>
+                    </Box>
 
-                    {/* Participants and Chat */}
-                    <div className="w-full mt-5 flex flex-col md:flex-row items-start gap-4">
-                        <ParticipantsList participants={participants}/>
-                        <Chat socket={socket} roomId={roomId} username={username} messages={messages} />
-                    </div>
-                </>
+                    {/* Drawer */}
+                    <Drawer
+                        anchor="right"
+                        open={drawerOpen}
+                        onClose={() => setDrawerOpen(false)}
+                        sx={{ width: 300, flexShrink: 0 }}
+                    >
+                        {drawerContent === 'participants' ? (
+                            <ParticipantsList participants={userInRoom} />
+                        ) : (
+                            <Chat
+                                socket={socket}
+                                roomId={roomId}
+                                username={username}
+                                messages={messages}
+                            />
+                        )}
+                    </Drawer>
+                </Box>
             )}
-        </div>
+        </ThemeProvider>
     );
-
 };
 
 export default VideoCallApp;
