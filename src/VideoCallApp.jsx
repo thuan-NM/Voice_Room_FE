@@ -18,9 +18,11 @@ import {
     TextField,
     Button,
 } from '@mui/material';
+const socketurl =
+    import.meta.env.WEBRTC_API;
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 
-const socket = io('http://localhost:5000', {
+const socket = io(socketurl, {
     transports: ['websocket', 'polling'],
 });
 
@@ -120,7 +122,8 @@ const VideoCallApp = () => {
         return pc;
     };
 
-    const joinRoom = () => {
+    const joinRoom = (event) => {
+        event.persist();
         if (roomId && key) { // Loại bỏ kiểm tra username
             console.log(`Joining room ${roomId} with key ${key}`);
             socket.emit('joinRoom', { roomId, key, userId, companyId }); // Loại bỏ username từ payload
@@ -291,7 +294,8 @@ const VideoCallApp = () => {
         };
     }, [peerConnections, isJoined]);
 
-    const leaveRoom = () => {
+    const leaveRoom = (event) => {
+        event.persist();
         if (isJoined) {
             // Close all peer connections
             Object.values(peerConnections).forEach((pc) => pc.close());
@@ -306,7 +310,8 @@ const VideoCallApp = () => {
         }
     };
 
-    const toggleMic = () => {
+    const toggleMic = (event) => {
+        event.persist();
         if (localStreamRef.current && localStreamRef.current.getAudioTracks().length > 0) {
             const audioTrack = localStreamRef.current.getAudioTracks()[0];
             setMicMuted((prevState) => {
@@ -316,7 +321,8 @@ const VideoCallApp = () => {
         }
     };
 
-    const toggleCamera = () => {
+    const toggleCamera = (event) => {
+        event.persist();
         if (localStreamRef.current && localStreamRef.current.getVideoTracks().length > 0) {
             const videoTrack = localStreamRef.current.getVideoTracks()[0];
             setCameraOff((prevState) => {
@@ -326,7 +332,8 @@ const VideoCallApp = () => {
         }
     };
 
-    const toggleRecording = () => {
+    const toggleRecording = (event) => {
+        event.persist();
         if (!recording) {
             startRecording();
         } else {
@@ -334,7 +341,8 @@ const VideoCallApp = () => {
         }
     };
 
-    const startRecording = () => {
+    const startRecording = (event) => {
+        event.persist();
         recordedChunks.current = [];
         mediaRecorderRef.current = new MediaRecorder(localStreamRef.current);
         mediaRecorderRef.current.ondataavailable = (event) => {
@@ -352,13 +360,15 @@ const VideoCallApp = () => {
         toast.info('Bắt đầu ghi âm cuộc họp.');
     };
 
-    const stopRecording = () => {
+    const stopRecording = (event) => {
+        event.persist();
         mediaRecorderRef.current.stop();
         setRecording(false);
         toast.info('Đang xử lý ghi âm...');
     };
 
-    const toggleScreenShare = async () => {
+    const toggleScreenShare = async (event) => {
+        event.persist();
         if (!screenSharing) {
             try {
                 const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
@@ -392,7 +402,8 @@ const VideoCallApp = () => {
         }
     };
 
-    const stopScreenShare = () => {
+    const stopScreenShare = (event) => {
+        event.persist();
         Object.values(peerConnections).forEach((pc) => {
             const sender = pc.getSenders().find(s => s.track.kind === 'video');
             if (sender) {
@@ -408,13 +419,15 @@ const VideoCallApp = () => {
         toast.info('Chia sẻ màn hình đã dừng.');
     };
 
-    const openParticipants = () => {
+    const openParticipants = (event) => {
+        event.persist();
         setDrawerContent('participants');
         setDrawerOpen(true);
     };
 
     // Hàm mở chat
-    const openChat = () => {
+    const openChat = (event) => {
+        event.persist();
         setDrawerContent('chat');
         setDrawerOpen(true);
     };

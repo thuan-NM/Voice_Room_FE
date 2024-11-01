@@ -2,7 +2,8 @@
 
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:5000/rooms'; // Thay URL này thành URL của server nếu cần
+const API_BASE_URL =
+    import.meta.env.WEBRTC_API; // Thay URL này thành URL của server nếu cần
 
 // Lấy thông tin phòng (bao gồm participants)
 export const getRoomInfo = async(roomId) => {

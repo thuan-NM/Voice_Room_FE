@@ -18,6 +18,7 @@ const Video = ({ stream, muted }) => {
       autoPlay
       playsInline
       style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '8px' }}
+      className='scale-x-[-1]'
     />
   );
 };
