@@ -16,8 +16,7 @@ const Chat = ({ socket, roomId, username, messages }) => {
   const [message, setMessage] = useState('');
   const messagesEndRef = useRef(null);
 
-  const sendMessage = (event) => {
-    event.persist();
+  const sendMessage = () => {
     if (message.trim()) {
       const msg = { username, message };
       socket.emit('sendMessage', { roomId, message: msg });
