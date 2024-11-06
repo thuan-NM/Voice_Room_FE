@@ -1,3 +1,5 @@
+// src/VideoCallApp.jsx
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import io from 'socket.io-client';
@@ -7,40 +9,50 @@ import ParticipantsList from './components/ParticipantsList';
 import Chat from './components/Chat';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { saveAs } from 'file-saver'; // Đảm bảo đã cài đặt file-saver: npm install file-saver
+import { saveAs } from 'file-saver';
 import { getRoomInfo } from './api';
+import Draggable from 'react-draggable';
 import {
     Container,
     Box,
     Typography,
-    Grid,
     Drawer,
     TextField,
     Button,
+    Paper,
 } from '@mui/material';
-const socketurl =
-    import.meta.env.WEBRTC_API;
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 
-const socket = io('http://localhost:5000', {
+const socketurl = import.meta.env.VITE_API_URL;
+
+// Initialize socket outside component to prevent multiple connections
+const socket = io(socketurl, {
     transports: ['websocket', 'polling'],
 });
 
 const theme = createTheme({
     palette: {
         primary: {
-            main: '#1976d2', // Blue
+            main: '#2196f3', // Màu xanh dương
         },
         secondary: {
-            main: '#d32f2f', // Red
+            main: '#f50057', // Màu hồng
         },
+        error: {
+            main: '#d32f2f', // Màu đỏ
+        },
+    },
+    typography: {
+        fontFamily: 'Roboto, sans-serif',
     },
 });
 
 const VideoCallApp = () => {
     const { userId, companyId } = useParams();
+    const roomId = `${userId}-${companyId}`;
+
+    // State variables
     const [remoteStreams, setRemoteStreams] = useState({});
-    const [peerConnections, setPeerConnections] = useState({});
     const [key, setKey] = useState('');
     const [isJoined, setIsJoined] = useState(false);
     const [micMuted, setMicMuted] = useState(false);
@@ -51,24 +63,36 @@ const VideoCallApp = () => {
     const [userType, setUserType] = useState(null);
     const [userInRoom, setUserInRoom] = useState([]);
     const [participants, setParticipants] = useState([]);
-    const [username, setUsername] = useState(''); // Khai báo biến username
-    const [messages, setMessages] = useState([]); // Khai báo state cho tin nhắn
-    const mediaRecorderRef = useRef(null);
-    const recordedChunks = useRef([]);
-    const localStreamRef = useRef(null);
-    const localVideoRef = useRef(null);
-    const roomId = `${userId}-${companyId}`;
+    const [username, setUsername] = useState('');
+    const [messages, setMessages] = useState([]);
     const [drawerOpen, setDrawerOpen] = useState(false);
     const [drawerContent, setDrawerContent] = useState('participants');
+
+    // Refs
+    const peerConnectionsRef = useRef({});
+    const localStreamRef = useRef(null);
+    const localVideoRef = useRef(null);
+    const screenTrackRef = useRef(null);
+    const cameraTrackRef = useRef(null);
+    const screenStreamRef = useRef(null);
+    const draggableRef = useRef(null);
+    const mediaRecorderRef = useRef(null);
+    const canvasRef = useRef(null);
+    const canvasStreamRef = useRef(null);
+    const videoElementsRef = useRef([]);
+    const recordedChunksRef = useRef([]);
+    const animationFrameIdRef = useRef();
+
+    // Peer connections
+    const peerConnections = peerConnectionsRef.current;
 
     useEffect(() => {
         const getLocalStream = async () => {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 localStreamRef.current = stream;
-                if (localVideoRef.current) {
-                    localVideoRef.current.srcObject = stream;
-                }
+                // Lưu trữ track camera
+                cameraTrackRef.current = stream.getVideoTracks()[0];
             } catch (err) {
                 console.error('Error getting media stream:', err);
                 toast.error('Không thể truy cập webcam hoặc microphone.');
@@ -79,25 +103,24 @@ const VideoCallApp = () => {
         return () => {
             // Cleanup media streams
             if (localStreamRef.current) {
-                localStreamRef.current.getTracks().forEach(track => track.stop());
+                localStreamRef.current.getTracks().forEach((track) => track.stop());
                 localStreamRef.current = null;
-                if (localVideoRef.current) {
-                    localVideoRef.current.srcObject = null;
-                }
             }
+            // Cleanup canvas drawing
+            if (animationFrameIdRef.current) {
+                cancelAnimationFrame(animationFrameIdRef.current);
+            }
+            // Stop video elements
+            videoElementsRef.current.forEach((video) => {
+                video.pause();
+                video.srcObject = null;
+            });
         };
     }, []);
 
     const createPeerConnection = (socketId) => {
         const pc = new RTCPeerConnection({
-            iceServers: [
-                { urls: ["stun:stun.l.google.com:19302"] },
-                {
-                    urls: ["turn:turn.anyfirewall.com:443?transport=tcp"],
-                    username: "webrtc",
-                    credential: "webrtc"
-                }
-            ]
+            iceServers: [{ urls: ["stun:hk-turn1.xirsys.com"] }, { username: "-3LKC68VNAMjswMpgNk2AsJh8n60STZq4sZ1JrqZe5nZ3ABVUU_yTgN7sXW9UlgPAAAAAGcJ8mZ0aHVhbg==", credential: "595f356e-884d-11ef-b41a-0242ac120004", urls: ["turn:hk-turn1.xirsys.com:80?transport=udp", "turn:hk-turn1.xirsys.com:3478?transport=udp", "turn:hk-turn1.xirsys.com:80?transport=tcp", "turn:hk-turn1.xirsys.com:3478?transport=tcp", "turns:hk-turn1.xirsys.com:443?transport=tcp", "turns:hk-turn1.xirsys.com:5349?transport=tcp"] }]
         });
 
         pc.onicecandidate = (event) => {
@@ -107,6 +130,7 @@ const VideoCallApp = () => {
         };
 
         pc.ontrack = (event) => {
+            console.log(`Received track from ${socketId}`, event.streams[0]);
             setRemoteStreams((prevStreams) => ({
                 ...prevStreams,
                 [socketId]: event.streams[0],
@@ -123,9 +147,9 @@ const VideoCallApp = () => {
     };
 
     const joinRoom = () => {
-        if (roomId && key) { // Loại bỏ kiểm tra username
+        if (roomId && key) {
             console.log(`Joining room ${roomId} with key ${key}`);
-            socket.emit('joinRoom', { roomId, key, userId, companyId }); // Loại bỏ username từ payload
+            socket.emit('joinRoom', { roomId, key, userId, companyId });
             setIsJoined(true);
         } else {
             toast.error('Vui lòng nhập khóa phòng hợp lệ.');
@@ -136,7 +160,7 @@ const VideoCallApp = () => {
         const fetchRoomInfo = async () => {
             try {
                 const roomData = await getRoomInfo(roomId);
-                setUserInRoom(roomData.participants)
+                setUserInRoom(roomData.participants);
             } catch (error) {
                 console.error('Error fetching room information:', error);
             }
@@ -145,19 +169,17 @@ const VideoCallApp = () => {
         if (isJoined) {
             fetchRoomInfo();
         }
-    }, [isJoined, roomId, peerConnections, remoteStreams]);
+    }, [isJoined, roomId]);
 
     useEffect(() => {
         if (!isJoined) return;
 
+        // Socket event handlers
         socket.on('allUsers', (usersInfo) => {
-            const pcs = {};
-            const participantList = [];
-
             usersInfo.forEach(({ socketId, username }) => {
-                if (socketId !== socket.id) {
+                if (socketId !== socket.id && !peerConnections[socketId]) {
                     const pc = createPeerConnection(socketId);
-                    pcs[socketId] = pc;
+                    peerConnections[socketId] = pc;
 
                     pc.createOffer()
                         .then((offer) => pc.setLocalDescription(offer))
@@ -166,32 +188,30 @@ const VideoCallApp = () => {
                         })
                         .catch((error) => console.error('Error creating offer:', error));
 
-                    participantList.push({ socketId, username });
+                    setParticipants((prev) => [...prev, { socketId, username }]);
                 }
             });
-            setPeerConnections(pcs);
-            setParticipants(participantList);
         });
 
-        // Handle 'offer' event
         socket.on('offer', async ({ offer, from }) => {
             console.log('Received offer from:', from);
-            if (!peerConnections[from]) {
-                const pc = createPeerConnection(from);
-                setPeerConnections((prev) => ({ ...prev, [from]: pc }));
-                try {
-                    await pc.setRemoteDescription(new RTCSessionDescription(offer));
-                    const answer = await pc.createAnswer();
-                    await pc.setLocalDescription(answer);
-                    socket.emit('answer', { answer: pc.localDescription, to: from });
-                    console.log(`Sent answer to ${from}`);
-                } catch (error) {
-                    console.error('Error handling offer:', error);
-                }
+            let pc = peerConnections[from];
+            if (!pc) {
+                pc = createPeerConnection(from);
+                peerConnections[from] = pc;
+            }
+
+            try {
+                await pc.setRemoteDescription(new RTCSessionDescription(offer));
+                const answer = await pc.createAnswer();
+                await pc.setLocalDescription(answer);
+                socket.emit('answer', { answer: pc.localDescription, to: from });
+                console.log(`Sent answer to ${from}`);
+            } catch (error) {
+                console.error('Error handling offer:', error);
             }
         });
 
-        // Handle 'answer' event
         socket.on('answer', async ({ answer, from }) => {
             console.log('Received answer from:', from);
             const pc = peerConnections[from];
@@ -205,7 +225,6 @@ const VideoCallApp = () => {
             }
         });
 
-        // Handle 'candidate' event
         socket.on('candidate', async ({ candidate, from }) => {
             console.log('Received candidate from:', from);
             const pc = peerConnections[from];
@@ -219,44 +238,33 @@ const VideoCallApp = () => {
             }
         });
 
-        // Handle 'userDisconnected' event
         socket.on('userDisconnected', ({ username: disconnectedUsername, socketId }) => {
             console.log(`User ${disconnectedUsername} (ID: ${socketId}) disconnected`);
             const pc = peerConnections[socketId];
             if (pc) {
                 pc.close();
-
-                setPeerConnections((prev) => {
-                    const updated = { ...prev };
-                    delete updated[socketId];
-                    return updated;
-                });
-
-                setRemoteStreams((prevStreams) => {
-                    const updatedStreams = { ...prevStreams };
-                    delete updatedStreams[socketId];
-                    return updatedStreams;
-                });
-
-                setParticipants((prev) => prev.filter(p => p.socketId !== socketId));
-                toast.warn(`${disconnectedUsername} đã rời phòng.`);
+                delete peerConnections[socketId];
             }
+
+            setRemoteStreams((prevStreams) => {
+                const updatedStreams = { ...prevStreams };
+                delete updatedStreams[socketId];
+                return updatedStreams;
+            });
+
+            setParticipants((prev) => prev.filter((p) => p.socketId !== socketId));
+            toast.warn(`${disconnectedUsername} đã rời phòng.`);
         });
 
-        // Handle 'error' event
         socket.on('error', (message) => {
             console.log('Received error:', message);
             toast.error(message);
             setIsJoined(false);
             setUserInfo(null);
-            setUsername(''); // Reset username nếu muốn
-            setKey(''); // Reset key nếu muốn
+            setUsername('');
+            setKey('');
         });
 
-        // Handle 'userInfo' event
-        // Trong phần useEffect xử lý 'userInfo' event
-
-        // In your socket event handlers
         socket.on('userInfo', ({ userInfo, userType, username: serverUsername }) => {
             setUserInfo(userInfo);
             setUserType(userType);
@@ -266,21 +274,19 @@ const VideoCallApp = () => {
             setParticipants((prev) => [...prev, { socketId: socket.id, username: serverUsername }]);
         });
 
-        // Handle 'userJoined' event
         socket.on('userJoined', ({ username: newUsername, socketId }) => {
             console.log('User joined:', newUsername, socketId);
             toast.info(`${newUsername} đã tham gia phòng.`);
             setParticipants((prev) => [...prev, { socketId, username: newUsername }]);
         });
 
-        // Handle 'receiveMessage' event
         socket.on('receiveMessage', (msg) => {
             console.log('Received message:', msg);
             setMessages((prev) => [...prev, msg]);
         });
 
+        // Cleanup
         return () => {
-            // Cleanup event listeners
             socket.off('allUsers');
             socket.off('offer');
             socket.off('answer');
@@ -291,20 +297,34 @@ const VideoCallApp = () => {
             socket.off('userJoined');
             socket.off('receiveMessage');
         };
-    }, [peerConnections, isJoined]);
+    }, [isJoined, peerConnections]);
 
     const leaveRoom = () => {
         if (isJoined) {
             // Close all peer connections
-            Object.values(peerConnections).forEach((pc) => pc.close());
-            setPeerConnections({});
+            Object.values(peerConnectionsRef.current).forEach((pc) => pc.close());
+            peerConnectionsRef.current = {};
             setRemoteStreams({});
-            socket.emit('leaveRoom', { roomId }); // Loại bỏ username từ payload
+            socket.emit('leaveRoom', { roomId });
             setIsJoined(false);
-            setKey(''); // Clear the key nếu muốn
+            setKey('');
             setParticipants([]);
-            setUsername(''); // Reset username nếu muốn
+            setUsername('');
             toast.info('Bạn đã rời phòng.');
+
+            // Stop canvas drawing and video elements
+            if (animationFrameIdRef.current) {
+                cancelAnimationFrame(animationFrameIdRef.current);
+            }
+            videoElementsRef.current.forEach((video) => {
+                video.pause();
+                video.srcObject = null;
+            });
+
+            // Dừng chia sẻ màn hình nếu đang chia sẻ
+            if (screenSharing) {
+                stopScreenShare();
+            }
         }
     };
 
@@ -337,27 +357,101 @@ const VideoCallApp = () => {
     };
 
     const startRecording = () => {
-        recordedChunks.current = [];
-        mediaRecorderRef.current = new MediaRecorder(localStreamRef.current);
+        recordedChunksRef.current = [];
+
+        // Create an off-screen canvas
+        const canvas = document.createElement('canvas');
+        canvas.width = 1280;
+        canvas.height = 720;
+        canvasRef.current = canvas;
+
+        const ctx = canvas.getContext('2d');
+
+        // Create video elements for all streams
+        const allStreams = [localStreamRef.current, ...Object.values(remoteStreams)];
+        videoElementsRef.current = allStreams.map((stream) => {
+            const video = document.createElement('video');
+            video.srcObject = stream;
+            video.muted = true;
+            video.play();
+            return video;
+        });
+
+        // Function to draw videos onto the canvas
+        const draw = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            videoElementsRef.current.forEach((video, index) => {
+                const cols = 2;
+                const rows = Math.ceil(videoElementsRef.current.length / cols);
+                const width = canvas.width / cols;
+                const height = canvas.height / rows;
+                const x = (index % cols) * width;
+                const y = Math.floor(index / cols) * height;
+                ctx.drawImage(video, x, y, width, height);
+            });
+            animationFrameIdRef.current = requestAnimationFrame(draw);
+        };
+
+        draw();
+
+        // Capture the canvas stream
+        const stream = canvas.captureStream(30);
+        canvasStreamRef.current = stream;
+
+        // Combine audio tracks
+        const audioTracks = [];
+        allStreams.forEach((stream) => {
+            const audioTrack = stream.getAudioTracks()[0];
+            if (audioTrack) {
+                audioTracks.push(audioTrack);
+            }
+        });
+
+        const combinedStream = new MediaStream([...stream.getVideoTracks(), ...audioTracks]);
+
+        // Initialize MediaRecorder
+        try {
+            mediaRecorderRef.current = new MediaRecorder(combinedStream, {
+                mimeType: 'video/webm; codecs=vp9',
+            });
+        } catch (e) {
+            console.error('Exception while creating MediaRecorder:', e);
+            toast.error('MediaRecorder không được hỗ trợ trong trình duyệt này.');
+            return;
+        }
+
         mediaRecorderRef.current.ondataavailable = (event) => {
             if (event.data.size > 0) {
-                recordedChunks.current.push(event.data);
+                recordedChunksRef.current.push(event.data);
             }
         };
+
         mediaRecorderRef.current.onstop = () => {
-            const blob = new Blob(recordedChunks.current, { type: 'video/webm' });
+            const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
             saveAs(blob, 'recording.webm');
             toast.success('Ghi âm cuộc họp đã hoàn thành và được tải xuống.');
         };
-        mediaRecorderRef.current.start();
+
+        mediaRecorderRef.current.start(1000);
         setRecording(true);
         toast.info('Bắt đầu ghi âm cuộc họp.');
     };
 
     const stopRecording = () => {
-        mediaRecorderRef.current.stop();
-        setRecording(false);
-        toast.info('Đang xử lý ghi âm...');
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            mediaRecorderRef.current.stop();
+            setRecording(false);
+            toast.info('Đang xử lý ghi âm...');
+
+            // Stop canvas drawing
+            cancelAnimationFrame(animationFrameIdRef.current);
+
+            // Stop video elements
+            videoElementsRef.current.forEach((video) => {
+                video.pause();
+                video.srcObject = null;
+            });
+        }
     };
 
     const toggleScreenShare = async () => {
@@ -365,26 +459,24 @@ const VideoCallApp = () => {
             try {
                 const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
                 const screenTrack = screenStream.getVideoTracks()[0];
+                screenTrackRef.current = screenTrack;
+                screenStreamRef.current = screenStream;
 
                 // Thay thế track video hiện tại bằng track screen
                 Object.values(peerConnections).forEach((pc) => {
-                    const sender = pc.getSenders().find(s => s.track.kind === 'video');
+                    const sender = pc.getSenders().find((s) => s.track.kind === 'video');
                     if (sender) {
                         sender.replaceTrack(screenTrack);
+                        console.log('Replaced video track with screen share track.');
                     }
                 });
 
-                // Cập nhật local video
-                if (localVideoRef.current) {
-                    localVideoRef.current.srcObject = screenStream;
-                }
+                setScreenSharing(true);
+                toast.info('Chia sẻ màn hình đã bắt đầu.');
 
                 screenTrack.onended = () => {
                     stopScreenShare();
                 };
-
-                setScreenSharing(true);
-                toast.info('Chia sẻ màn hình đã bắt đầu.');
             } catch (error) {
                 console.error('Error sharing screen:', error);
                 toast.error('Không thể chia sẻ màn hình.');
@@ -395,19 +487,30 @@ const VideoCallApp = () => {
     };
 
     const stopScreenShare = () => {
-        Object.values(peerConnections).forEach((pc) => {
-            const sender = pc.getSenders().find(s => s.track.kind === 'video');
-            if (sender) {
-                sender.replaceTrack(localStreamRef.current.getVideoTracks()[0]);
+        if (screenTrackRef.current && cameraTrackRef.current) {
+            const screenTrack = screenTrackRef.current;
+            const cameraTrack = cameraTrackRef.current;
+
+            // Thay thế screen track bằng camera track trong mỗi peer connection
+            Object.values(peerConnections).forEach((pc) => {
+                const sender = pc.getSenders().find((s) => s.track.kind === 'video');
+                if (sender) {
+                    sender.replaceTrack(cameraTrack);
+                    console.log('Replaced screen share track with camera track.');
+                }
+            });
+
+            // Dừng và xóa screen track và stream
+            screenTrack.stop();
+            if (screenStreamRef.current) {
+                screenStreamRef.current.getTracks().forEach((track) => track.stop());
+                screenStreamRef.current = null;
             }
-        });
+            screenTrackRef.current = null;
 
-        if (localVideoRef.current) {
-            localVideoRef.current.srcObject = localStreamRef.current;
+            setScreenSharing(false);
+            toast.info('Chia sẻ màn hình đã dừng.');
         }
-
-        setScreenSharing(false);
-        toast.info('Chia sẻ màn hình đã dừng.');
     };
 
     const openParticipants = () => {
@@ -415,7 +518,6 @@ const VideoCallApp = () => {
         setDrawerOpen(true);
     };
 
-    // Hàm mở chat
     const openChat = () => {
         setDrawerContent('chat');
         setDrawerOpen(true);
@@ -423,22 +525,17 @@ const VideoCallApp = () => {
 
     return (
         <ThemeProvider theme={theme}>
-            <ToastContainer position="top-right" autoClose={5000} hideProgressBar={false} />
-
+            <ToastContainer position="top-right" autoClose={2500} hideProgressBar={false} />
             {!isJoined ? (
                 // Join Room UI
-                <Container maxWidth="sm">
-                    <Box
-                        sx={{
-                            mt: 8,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                        }}
-                    >
-                        <Typography component="h1" variant="h5">
-                            Join Room
-                        </Typography>
+                <Container maxWidth="sm" className='!flex !justify-center !items-center'>
+                    <Paper elevation={3} sx={{ mt: 8, p: 4 }}>
+                        <Box sx={{ textAlign: 'center' }}>
+                            <img src="/logo.png" alt="Logo" style={{ width: 100 }} />
+                            <Typography component="h1" variant="h5">
+                                Tham Gia Phòng
+                            </Typography>
+                        </Box>
                         <Box component="form" sx={{ mt: 3 }}>
                             <TextField
                                 variant="outlined"
@@ -466,68 +563,126 @@ const VideoCallApp = () => {
                                 sx={{ mt: 2 }}
                                 onClick={joinRoom}
                             >
-                                Join
+                                Tham Gia
                             </Button>
                         </Box>
-                    </Box>
+                    </Paper>
                 </Container>
             ) : (
                 // Video Call UI
-                <Box sx={{ display: 'flex', height: '100vh' }}>
-                    {/* Video Area */}
-                    <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                        <Grid container spacing={2} sx={{ flex: 1, p: 2, overflowY: 'auto' }}>
-                            {/* Local Video */}
-                            <Grid item xs={12} sm={6} md={4} lg={3} sx={{ position: 'relative' }}>
-                                <Video stream={localStreamRef.current} muted={true} />
-                                <Typography
-                                    variant="caption"
-                                    sx={{ position: 'absolute', bottom: 8, left: 8, color: '#fff' }}
-                                >
-                                    You
-                                </Typography>
-                            </Grid>
+                <Box sx={{ display: 'flex', height: '100vh', flexDirection: 'column' }}>
 
-                            {/* Remote Videos */}
+                    {/* Video Area */}
+                    <Box sx={{ flex: 1, display: 'flex', position: 'relative', backgroundColor: '#fff', overflow: 'hidden' }}>
+                        {/* Remote Streams */}
+                        <Box
+                            sx={{
+                                flex: 1,
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                alignContent: 'flex-start',
+                                justifyContent: 'center',
+                                overflow: 'hidden', // Ẩn thanh cuộn
+                            }}
+                        >
                             {Object.entries(remoteStreams).map(([socketId, stream]) => {
                                 const participant = participants.find((p) => p.socketId === socketId);
                                 const remoteUsername = participant ? participant.username : 'User';
                                 return (
-                                    <Grid
+                                    <Box
                                         key={socketId}
-                                        item
-                                        xs={12}
-                                        sm={6}
-                                        md={4}
-                                        lg={3}
-                                        sx={{ position: 'relative' }}
+                                        sx={{
+                                            position: 'relative',
+                                            width: '100%',
+                                            aspectRatio: '16 / 9', // Giữ tỉ lệ 16:9
+                                            margin: '1%',
+                                            backgroundColor: '#000',
+                                            borderRadius: '8px',
+                                            overflow: 'hidden',
+                                            boxShadow: 3,
+                                        }}
                                     >
-                                        <Video stream={stream} muted={false} />
-                                        <Typography
-                                            variant="caption"
-                                            sx={{ position: 'absolute', bottom: 8, left: 8, color: '#fff' }}
-                                        >
-                                            {remoteUsername}
-                                        </Typography>
-                                    </Grid>
+                                        <Video
+                                            stream={stream}
+                                            muted={false}
+                                            username={remoteUsername}
+                                        />
+                                    </Box>
                                 );
                             })}
-                        </Grid>
-                        {/* Controls */}
-                        <Controls
-                            micMuted={micMuted}
-                            toggleMic={toggleMic}
-                            cameraOff={cameraOff}
-                            toggleCamera={toggleCamera}
-                            leaveRoom={leaveRoom}
-                            screenSharing={screenSharing}
-                            toggleScreenShare={toggleScreenShare}
-                            recording={recording}
-                            toggleRecording={toggleRecording}
-                            openParticipants={openParticipants}
-                            openChat={openChat}
-                        />
+                            {Object.keys(remoteStreams).length === 0 && (
+                                <Box
+                                    sx={{
+                                        width: '100%',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        height: '100%',
+                                    }}
+                                >
+                                    <Typography variant="h6" color="text.secondary" className='text-center'>
+                                        Đang chờ người khác tham gia...
+                                    </Typography>
+                                </Box>
+                            )}
+                        </Box>
+
+                        {/* Local Video */}
+                        <Draggable nodeRef={draggableRef}>
+                            <Box
+                                ref={draggableRef}
+                                sx={{
+                                    position: 'absolute',
+                                    bottom: 100,
+                                    right: 16,
+                                    width: { xs: 150, sm: 200 },
+                                    height: { xs: 112, sm: 150 },
+                                    border: '2px solid #fff',
+                                    borderRadius: '8px',
+                                    overflow: 'hidden',
+                                    boxShadow: 3,
+                                    zIndex: 10,
+                                    backgroundColor: '#000',
+                                    cursor: 'move',
+                                }}
+                            >
+                                <Video
+                                    stream={localStreamRef.current}
+                                    muted={true}
+                                    flip={true}
+                                    username="You"
+                                />
+                                <Typography
+                                    variant="caption"
+                                    sx={{
+                                        position: 'absolute',
+                                        bottom: 8,
+                                        left: 8,
+                                        color: '#fff',
+                                        backgroundColor: 'rgba(0,0,0,0.5)',
+                                        padding: '2px 4px',
+                                        borderRadius: '4px',
+                                    }}
+                                >
+                                </Typography>
+                            </Box>
+                        </Draggable>
                     </Box>
+
+                    {/* Controls */}
+                    <Controls
+                        micMuted={micMuted}
+                        toggleMic={toggleMic}
+                        cameraOff={cameraOff}
+                        toggleCamera={toggleCamera}
+                        leaveRoom={leaveRoom}
+                        screenSharing={screenSharing}
+                        toggleScreenShare={toggleScreenShare}
+                        recording={recording}
+                        toggleRecording={toggleRecording}
+                        openChat={openChat}
+                        openParticipants={openParticipants}
+                    />
 
                     {/* Drawer */}
                     <Drawer
@@ -537,14 +692,9 @@ const VideoCallApp = () => {
                         sx={{ width: 300, flexShrink: 0 }}
                     >
                         {drawerContent === 'participants' ? (
-                            <ParticipantsList participants={userInRoom} />
+                            <ParticipantsList participants={participants} />
                         ) : (
-                            <Chat
-                                socket={socket}
-                                roomId={roomId}
-                                username={username}
-                                messages={messages}
-                            />
+                            <Chat socket={socket} roomId={roomId} username={username} messages={messages} />
                         )}
                     </Drawer>
                 </Box>

@@ -1,0 +1,106 @@
+/* src/components/Video.css */
+
+
+/* Ẩn các điều khiển mặc định trên các trình duyệt khác nhau */
+
+.custom-video::-webkit-media-controls {
+    display: none !important;
+}
+
+.custom-video::-moz-media-controls {
+    display: none !important;
+}
+
+.custom-video::-webkit-media-controls-enclosure {
+    display: none !important;
+}
+
+.custom-video::-webkit-media-controls-panel {
+    display: none !important;
+}
+
+
+/* Ẩn điều khiển khi video ở chế độ fullscreen */
+
+.custom-video:fullscreen::-webkit-media-controls {
+    display: none !important;
+}
+
+.custom-video:-webkit-full-screen::-webkit-media-controls {
+    display: none !important;
+}
+
+.custom-video:fullscreen::-moz-media-controls {
+    display: none !important;
+}
+
+.custom-video:-moz-full-screen::-moz-media-controls {
+    display: none !important;
+}
+
+.custom-video:fullscreen::-ms-media-controls {
+    display: none !important;
+}
+
+.custom-video:-ms-fullscreen::-ms-media-controls {
+    display: none !important;
+}
+
+
+/* src/components/Video.css */
+
+.video-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.video-element {
+    width: 100%;
+    object-fit: contain;
+}
+
+.fullscreen-button {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(0, 0, 0, 0.5);
+    display: none;
+    /* Ẩn mặc định */
+    transition: background-color 0.3s;
+    border-radius: 50%;
+    padding: 8px;
+    z-index: 2;
+    /* Đặt z-index cao để đảm bảo nút hiển thị trên cùng */
+}
+
+.video-container:hover .fullscreen-button {
+    display: block;
+    /* Hiển thị khi hover */
+}
+
+.video-container.fullscreen-active .fullscreen-button {
+    display: block;
+    /* Hiển thị luôn khi fullscreen */
+}
+
+.fullscreen-button:hover {
+    background-color: rgba(0, 0, 0, 0.7);
+}
+
+.username-label {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    background-color: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    z-index: 2;
+    /* Đặt z-index cao để đảm bảo nhãn hiển thị trên cùng */
+}
