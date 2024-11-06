@@ -23,12 +23,6 @@ import {
 } from '@mui/material';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 
-const socketurl = import.meta.env.VITE_API_URL;
-
-// Initialize socket outside component to prevent multiple connections
-const socket = io(socketurl, {
-    transports: ['websocket', 'polling'],
-});
 
 const theme = createTheme({
     palette: {
@@ -50,6 +44,14 @@ const theme = createTheme({
 const VideoCallApp = () => {
     const { userId, companyId } = useParams();
     const roomId = `${userId}-${companyId}`;
+
+
+    const socketurl = import.meta.env.VITE_API_URL;
+
+    // Initialize socket outside component to prevent multiple connections
+    const socket = io(socketurl, {
+        transports: ['websocket', 'polling'],
+    });
 
     // State variables
     const [remoteStreams, setRemoteStreams] = useState({});
