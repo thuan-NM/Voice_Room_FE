@@ -1,0 +1,6 @@
+{
+    "rewrites": [{
+        "source": "/call/:userId/:companyId",
+        "destination": "/"
+    }]
+}
