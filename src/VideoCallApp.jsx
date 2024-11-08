@@ -40,18 +40,16 @@ const theme = createTheme({
         fontFamily: 'Roboto, sans-serif',
     },
 });
+const socketurl = import.meta.env.VITE_API_URL;
+
+// Initialize socket outside component to prevent multiple connections
+const socket = io(socketurl, {
+    transports: ['websocket', 'polling'],
+});
 
 const VideoCallApp = () => {
     const { userId, companyId } = useParams();
     const roomId = `${userId}-${companyId}`;
-
-
-    const socketurl = import.meta.env.VITE_API_URL;
-
-    // Initialize socket outside component to prevent multiple connections
-    const socket = io(socketurl, {
-        transports: ['websocket', 'polling'],
-    });
 
     // State variables
     const [remoteStreams, setRemoteStreams] = useState({});
