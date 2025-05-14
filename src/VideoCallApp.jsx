@@ -147,7 +147,7 @@ const VideoCallApp = () => {
     };
 
     const joinRoom = () => {
-        if (roomId && key) {
+        if (roomId) {
             console.log(`Joining room ${roomId} with key ${key}`);
             socket.emit('joinRoom', { roomId, key, userId, companyId });
             setIsJoined(true);
