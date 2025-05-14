@@ -531,10 +531,7 @@ const VideoCallApp = () => {
                 <Container maxWidth="sm" className='!flex !justify-center !items-center'>
                     <Paper elevation={3} sx={{ mt: 8, p: 4 }}>
                         <Box sx={{ textAlign: 'center' }}>
-                            <img src="/logo.png" alt="Logo" style={{ width: 100 }} />
-                            <Typography component="h1" variant="h5">
-                                Tham Gia Phòng
-                            </Typography>
+                            <img src="/myfavicon.png" alt="Logo" className='w-full' />
                         </Box>
                         <Box component="form" sx={{ mt: 3 }}>
                             <TextField
